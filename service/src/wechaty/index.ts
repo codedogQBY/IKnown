@@ -1,6 +1,8 @@
 import { WechatyBuilder, Message, types } from 'wechaty'
 const qrTerm = require('qrcode-terminal')
 const convert = require('xml-js')
+import urlParseService from '../service/urlParseService'
+import openAiService from '../service/openAiService'
 
 const bot = WechatyBuilder.build({
   name: 'IKnown',
@@ -41,14 +43,32 @@ bot
       if (!message.self()) {
         console.log(message.type())
         if (message.type() === types.Message.Text) {
+          // 是http或者https链接
+          if (/^https?:\/\//.test(content)) {
+            try {
+              const {
+                title,
+                author,
+                content: article,
+                link,
+              } = await urlParseService.parseUrl(content)
+              const summary = await openAiService.getSummary(article)
+              await contact.say(summary || '解析失败')
+            } catch (e) {
+              console.log(e)
+            }
+          }
         }
         if (message.type() === types.Message.Url) {
           try {
             const json = convert.xml2json(content, { compact: true })
             const { url, title } = extractInfo(json)
-            // const rs = await extract(url)
-            // console.log(rs)
-            console.log(title, url)
+            if (url) {
+              const { title, author, content, link } =
+                await urlParseService.parseUrl(url)
+              const summary = await openAiService.getSummary(content)
+              await contact.say(summary || '解析失败')
+            }
           } catch (e) {
             console.log(e)
           }
